@@ -62,6 +62,7 @@ func TestNewDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer db1.Close()
 	_, err = db1.ExecContext(ctx, createTableStmt)
 	if err != nil {
 		t.Fatal("CREATE TABLE in database #1:", err)
@@ -71,9 +72,27 @@ func TestNewDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer db2.Close()
 	// If this fails, it likely means that the server is returning the same database.
 	_, err = db2.ExecContext(ctx, createTableStmt)
 	if err != nil {
 		t.Fatal("CREATE TABLE in database #2:", err)
+	}
+}
+
+func BenchmarkCreateDatabase(b *testing.B) {
+	ctx := context.Background()
+	srv, err := Start(ctx)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(srv.Cleanup)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := srv.CreateDatabase(ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }
