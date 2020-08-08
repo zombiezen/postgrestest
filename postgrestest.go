@@ -227,6 +227,9 @@ func (srv *Server) stop() {
 // cannot find the program on the PATH, then it searches some well-known
 // PostgreSQL installation paths.
 func command(name string, args ...string) (*exec.Cmd, error) {
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	p, lookErr := exec.LookPath(name)
 	if lookErr == nil {
 		return exec.Command(p, args...), nil
@@ -243,10 +246,10 @@ func command(name string, args ...string) (*exec.Cmd, error) {
 }
 
 func findPostgresBin() {
+	dir := "/usr/lib/postgresql"
 	if runtime.GOOS == "windows" {
-		return
+		dir = `C:\Program Files\PostgreSQL`
 	}
-	const dir = "/usr/lib/postgresql"
 	listing, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return
