@@ -4,7 +4,7 @@
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 Package `postgrestest` provides a test harness that starts an ephemeral
-[PostgreSQL][] server.
+[PostgreSQL][] server. It is tested on macOS, Linux, and Windows.
 
 [PostgreSQL]: https://www.postgresql.org/
 
