@@ -20,14 +20,12 @@
 package postgrestest
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/url"
@@ -48,9 +46,6 @@ type Server struct {
 	dir     string
 	baseURL string
 	conn    *sql.DB
-
-	exited  <-chan struct{}
-	waitErr error
 }
 
 // Start starts a PostgreSQL server with an empty database and waits for it to
@@ -104,21 +99,11 @@ func Start(ctx context.Context) (_ *Server, err error) {
 	}
 
 	// Start process.
-	logFile, err := os.OpenFile(filepath.Join(dir, "log.txt"), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0644)
+	logFile := filepath.Join(dir, "log.txt")
+	err = runCommand("pg_ctl", "start", "--pgdata="+dataDir, "--log="+logFile)
 	if err != nil {
 		return nil, fmt.Errorf("start postgres: %w", err)
 	}
-	defer logFile.Close() // only used to read startup errors
-	proc, err := command("postgres", "-D", dataDir)
-	if err != nil {
-		return nil, fmt.Errorf("start postgres: %w", err)
-	}
-	proc.Stdout = logFile
-	proc.Stderr = logFile
-	if err := proc.Start(); err != nil {
-		return nil, fmt.Errorf("start postgres: %w", err)
-	}
-	exited := make(chan struct{})
 	srv := &Server{
 		dir: dir,
 		baseURL: (&url.URL{
@@ -127,12 +112,7 @@ func Start(ctx context.Context) (_ *Server, err error) {
 			User:   url.UserPassword(superuserName, superuserPassword),
 			Path:   "/",
 		}).String(),
-		exited: exited,
 	}
-	go func() {
-		defer close(exited)
-		srv.waitErr = proc.Wait()
-	}()
 
 	// Wait for server to come up healthy.
 	srv.conn, err = sql.Open("postgres", srv.DefaultDatabase())
@@ -150,15 +130,9 @@ func Start(ctx context.Context) (_ *Server, err error) {
 	srv.conn.SetMaxOpenConns(1)
 	for {
 		select {
-		case <-exited:
-			logOutput := readLogFile(logFile)
-			if len(logOutput) == 0 {
-				return nil, fmt.Errorf("start postgres: %w", srv.waitErr)
-			}
-			return nil, fmt.Errorf("start postgres: %w\n%s", srv.waitErr, logOutput)
 		case <-ctx.Done():
 			srv.stop()
-			logOutput := readLogFile(logFile)
+			logOutput, _ := ioutil.ReadFile(logFile)
 			if len(logOutput) == 0 {
 				return nil, fmt.Errorf("start postgres: %w", ctx.Err())
 			}
@@ -215,12 +189,12 @@ func (srv *Server) Cleanup() {
 func (srv *Server) stop() {
 	// Use Immediate Shutdown mode. We don't care about data corruption.
 	// https://www.postgresql.org/docs/current/server-shutdown.html
+	//
 	// TODO(someday): What happens if this fails?
 	runCommand("pg_ctl", "stop",
-		"-D", filepath.Join(srv.dir, "data"),
-		"-m", "immediate",
-		"--no-wait")
-	<-srv.exited
+		"--pgdata="+filepath.Join(srv.dir, "data"),
+		"--mode=immediate",
+		"--wait")
 }
 
 // command creates an *exec.Cmd for the given PostgreSQL program. If it it
@@ -302,14 +276,6 @@ func findUnusedTCPPort() (int, error) {
 		return 0, fmt.Errorf("find unused tcp port: %w", err)
 	}
 	return port, nil
-}
-
-func readLogFile(f io.ReadSeeker) []byte {
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return nil
-	}
-	data, _ := ioutil.ReadAll(f)
-	return bytes.TrimSuffix(data, []byte("\n"))
 }
 
 func randomString(n int) (string, error) {

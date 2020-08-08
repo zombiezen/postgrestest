@@ -19,7 +19,7 @@ on: push
 jobs:
   linux:
     name: Linux
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - name: Set up Go
       uses: actions/setup-go@v1
@@ -44,7 +44,7 @@ jobs:
         GO111MODULE: on
   windows:
     name: Windows
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
     - name: Set up Go
       uses: actions/setup-go@v1
@@ -57,6 +57,6 @@ jobs:
       env:
         GO111MODULE: on
     - name: Run tests
-      run: runas /trustlevel:0x20000 "go test -mod=readonly -race -v ./..."
+      run: go test -mod=readonly -race -v ./...
       env:
         GO111MODULE: on
