@@ -43,6 +43,7 @@ import (
 
 const superuserName = "postgres"
 
+// A Server represents a running PostgreSQL server.
 type Server struct {
 	dir     string
 	baseURL string
@@ -52,6 +53,8 @@ type Server struct {
 	waitErr error
 }
 
+// Start starts a PostgreSQL server with an empty database and waits for it to
+// accept connections.
 func Start(ctx context.Context) (_ *Server, err error) {
 	// Prepare data directory.
 	dir, err := ioutil.TempDir("", "postgrestest")
@@ -178,8 +181,8 @@ func (srv *Server) dsn(dbName string) string {
 }
 
 // NewDatabase opens a connection to a freshly created database on the server.
-func (srv *Server) NewDatabase() (*sql.DB, error) {
-	dsn, err := srv.CreateDatabase()
+func (srv *Server) NewDatabase(ctx context.Context) (*sql.DB, error) {
+	dsn, err := srv.CreateDatabase(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -188,12 +191,13 @@ func (srv *Server) NewDatabase() (*sql.DB, error) {
 
 // CreateDatabase creates a new database on the server and returns its
 // data source name.
-func (srv *Server) CreateDatabase() (string, error) {
+func (srv *Server) CreateDatabase(ctx context.Context) (string, error) {
 	dbName, err := randomString(16)
 	if err != nil {
 		return "", fmt.Errorf("new database: %w", err)
 	}
-	if _, err := srv.conn.Exec("CREATE DATABASE \"" + dbName + "\";"); err != nil {
+	_, err = srv.conn.ExecContext(ctx, "CREATE DATABASE \""+dbName+"\";")
+	if err != nil {
 		return "", fmt.Errorf("new database: %w", err)
 	}
 	return srv.dsn(dbName), nil

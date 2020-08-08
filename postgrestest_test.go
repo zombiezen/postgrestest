@@ -58,7 +58,7 @@ func TestNewDatabase(t *testing.T) {
 	t.Cleanup(srv.Cleanup)
 
 	const createTableStmt = `CREATE TABLE foo (id SERIAL PRIMARY KEY);`
-	db1, err := srv.NewDatabase()
+	db1, err := srv.NewDatabase(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestNewDatabase(t *testing.T) {
 		t.Fatal("CREATE TABLE in database #1:", err)
 	}
 
-	db2, err := srv.NewDatabase()
+	db2, err := srv.NewDatabase(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
