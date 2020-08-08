@@ -15,7 +15,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package postgrestest provides a test harness that starts an ephemeral
-// PostgreSQL server. PostgreSQL must be locally installed for this package to
+// PostgreSQL server. PostgreSQL must be installed locally for this package to
 // work.
 package postgrestest
 
