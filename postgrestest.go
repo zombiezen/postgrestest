@@ -46,6 +46,9 @@ type Server struct {
 	dir     string
 	baseURL string
 	conn    *sql.DB
+
+	exited  <-chan struct{}
+	waitErr error
 }
 
 // Start starts a PostgreSQL server with an empty database and waits for it to
@@ -98,12 +101,19 @@ func Start(ctx context.Context) (_ *Server, err error) {
 		return nil, fmt.Errorf("start postgres: %w", err)
 	}
 
-	// Start process.
+	// Start server process.
+	// On Unix systems, pg_ctl runs as a daemon.
+	// On Windows systems, pg_ctl runs in the foreground (not well-documented) and
+	// drops privileges as needed.
 	logFile := filepath.Join(dir, "log.txt")
-	err = runCommand("pg_ctl", "start", "--pgdata="+dataDir, "--log="+logFile)
+	proc, err := command("pg_ctl", "start", "--no-wait", "--pgdata="+dataDir, "--log="+logFile)
 	if err != nil {
 		return nil, fmt.Errorf("start postgres: %w", err)
 	}
+	if err := proc.Start(); err != nil {
+		return nil, fmt.Errorf("start postgres: %w", err)
+	}
+	exited := make(chan struct{})
 	srv := &Server{
 		dir: dir,
 		baseURL: (&url.URL{
@@ -112,7 +122,12 @@ func Start(ctx context.Context) (_ *Server, err error) {
 			User:   url.UserPassword(superuserName, superuserPassword),
 			Path:   "/",
 		}).String(),
+		exited: exited,
 	}
+	go func() {
+		defer close(exited)
+		srv.waitErr = proc.Wait()
+	}()
 
 	// Wait for server to come up healthy.
 	srv.conn, err = sql.Open("postgres", srv.DefaultDatabase())
@@ -195,6 +210,7 @@ func (srv *Server) stop() {
 		"--pgdata="+filepath.Join(srv.dir, "data"),
 		"--mode=immediate",
 		"--wait")
+	<-srv.exited
 }
 
 // command creates an *exec.Cmd for the given PostgreSQL program. If it it
