@@ -17,8 +17,12 @@
 package postgrestest
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 )
@@ -80,6 +84,17 @@ func TestNewDatabase(t *testing.T) {
 	}
 }
 
+func BenchmarkStart(b *testing.B) {
+	ctx := context.Background()
+	for i := 0; i < b.N; i++ {
+		srv, err := Start(ctx)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.Cleanup(srv.Cleanup)
+	}
+}
+
 func BenchmarkCreateDatabase(b *testing.B) {
 	ctx := context.Background()
 	srv, err := Start(ctx)
@@ -93,6 +108,101 @@ func BenchmarkCreateDatabase(b *testing.B) {
 		_, err := srv.CreateDatabase(ctx)
 		if err != nil {
 			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkDocker(b *testing.B) {
+	dockerExe, err := exec.LookPath("docker")
+	if err != nil {
+		b.Skip("Could not find Docker:", err)
+	}
+	pullCmd := exec.Command(dockerExe, "pull", "postgres")
+	pullOutput := new(bytes.Buffer)
+	pullCmd.Stdout = pullOutput
+	pullCmd.Stderr = pullOutput
+	err = pullCmd.Run()
+	b.Log(pullOutput)
+	if err != nil {
+		b.Fatal("docker pull:", err)
+	}
+
+	b.Run("Start", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			db, cleanup, err := startDocker(b, dockerExe)
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.Cleanup(cleanup)
+			db.Close()
+		}
+	})
+
+	b.Run("CreateDatabase", func(b *testing.B) {
+		db, cleanup, err := startDocker(b, dockerExe)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.Cleanup(cleanup)
+		defer db.Close()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			dbName, err := randomString(16)
+			if err != nil {
+				b.Fatal(err)
+			}
+			_, err = db.Exec("CREATE DATABASE \"" + dbName + "\";")
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+type logger interface {
+	Log(...interface{})
+}
+
+func startDocker(l logger, dockerExe string) (db *sql.DB, cleanup func(), _ error) {
+	port, err := findUnusedTCPPort()
+	if err != nil {
+		return nil, nil, err
+	}
+	c := exec.Command(dockerExe, "run",
+		"--rm",
+		"--detach",
+		fmt.Sprintf("--publish=127.0.0.1:%d:5432", port),
+		"--env=POSTGRES_PASSWORD=xyzzy",
+		"postgres")
+	imageID := new(strings.Builder)
+	c.Stdout = imageID
+	runLog := new(bytes.Buffer)
+	c.Stderr = runLog
+	if err := c.Run(); err != nil {
+		l.Log(runLog)
+		return nil, nil, err
+	}
+	cleanup = func() {
+		stopLog := new(bytes.Buffer)
+		c := exec.Command("docker", "stop", "--", strings.TrimSpace(imageID.String()))
+		c.Stdout = stopLog
+		c.Stderr = stopLog
+		if err := c.Run(); err != nil {
+			l.Log(err)
+			l.Log("docker stop:", err)
+		}
+	}
+	dsn := fmt.Sprintf("postgres://postgres:xyzzy@localhost:%d/postgres?sslmode=disable", port)
+	db, err = sql.Open("postgres", dsn)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	db.SetMaxOpenConns(1)
+	for {
+		if err := db.Ping(); err == nil {
+			return db, cleanup, nil
 		}
 	}
 }
