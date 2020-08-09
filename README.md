@@ -4,7 +4,10 @@
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 Package `postgrestest` provides a test harness that starts an ephemeral
-[PostgreSQL][] server. It is tested on macOS, Linux, and Windows.
+[PostgreSQL][] server. It is tested on macOS, Linux, and Windows. It can cut
+down the overhead of PostgreSQL in tests up to 90% compared to spinning up a
+`postgres` Docker container: starting a server with this package takes
+roughly 650 milliseconds and creating a database takes roughly 20 milliseconds.
 
 [PostgreSQL]: https://www.postgresql.org/
 
