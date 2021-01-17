@@ -221,16 +221,15 @@ func command(name string, args ...string) (*exec.Cmd, error) {
 		name += ".exe"
 	}
 	p, lookErr := exec.LookPath(name)
-	if lookErr == nil {
-		return exec.Command(p, args...), nil
-	}
-	postgresBin.init.Do(findPostgresBin)
-	if postgresBin.dir == "" {
-		return nil, lookErr
-	}
-	p = filepath.Join(postgresBin.dir, name)
-	if _, err := os.Stat(p); err != nil {
-		return nil, lookErr
+	if lookErr != nil {
+		postgresBin.init.Do(findPostgresBin)
+		if postgresBin.dir == "" {
+			return nil, lookErr
+		}
+		p = filepath.Join(postgresBin.dir, name)
+		if _, err := os.Stat(p); err != nil {
+			return nil, fmt.Errorf("%s\n%s", err, lookErr)
+		}
 	}
 	return exec.Command(p, args...), nil
 }
