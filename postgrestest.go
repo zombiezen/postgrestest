@@ -225,15 +225,19 @@ func command(name string, args ...string) (*exec.Cmd, error) {
 		name += ".exe"
 	}
 	p, lookErr := exec.LookPath(name)
-	if lookErr != nil {
-		postgresBin.init.Do(findPostgresBin)
-		if postgresBin.dir == "" {
-			return nil, lookErr
-		}
-		p = filepath.Join(postgresBin.dir, name)
-		if _, err := os.Stat(p); err != nil {
-			return nil, fmt.Errorf("%s\n%s", err, lookErr)
-		}
+	if lookErr == nil {
+		return exec.Command(p, args...), nil
+	}
+	// Find PostgreSQL installation path. If this doesn't work, return the
+	// original LookPath error, since the runner of the test should add the binary
+	// to their PATH if it can't be found.
+	postgresBin.init.Do(findPostgresBin)
+	if postgresBin.dir == "" {
+		return nil, lookErr
+	}
+	p = filepath.Join(postgresBin.dir, name)
+	if _, err := os.Stat(p); err != nil {
+		return nil, lookErr
 	}
 	return exec.Command(p, args...), nil
 }
