@@ -53,6 +53,10 @@ type Server struct {
 
 // Start starts a PostgreSQL server with an empty database and waits for it to
 // accept connections.
+//
+// Start looks for the programs "pg_ctl" and "initdb" in PATH. If these are not
+// found, then Start searches for them in /usr/lib/postgresql/*/bin, preferring
+// the highest version found.
 func Start(ctx context.Context) (_ *Server, err error) {
 	// Prepare data directory.
 	dir, err := ioutil.TempDir("", "postgrestest")
@@ -224,6 +228,9 @@ func command(name string, args ...string) (*exec.Cmd, error) {
 	if lookErr == nil {
 		return exec.Command(p, args...), nil
 	}
+	// Find PostgreSQL installation path. If this doesn't work, return the
+	// original LookPath error, since the runner of the test should add the binary
+	// to their PATH if it can't be found.
 	postgresBin.init.Do(findPostgresBin)
 	if postgresBin.dir == "" {
 		return nil, lookErr
