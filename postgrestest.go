@@ -54,11 +54,9 @@ type Server struct {
 // Start starts a PostgreSQL server with an empty database and waits for it to
 // accept connections.
 //
-// Start relies on a few PostgreSQL bundled binaries, namely "pg_ctl" and "initdb".
-// These binaries are used to initialize and manage local database clusters used
-// in your tests. The location of these binaries should reside somewhere in your
-// PATH or in /usr/lib/postgresql/X/bin on Linux. When selecting from the latter,
-//the "X" is the largest major version of PostgreSQL locally available.
+// Start looks for the programs "pg_ctl" and "initdb" in PATH. If these are not
+// found, then Start searches for them in /usr/lib/postgresql/*/bin, preferring
+// the highest version found.
 func Start(ctx context.Context) (_ *Server, err error) {
 	// Prepare data directory.
 	dir, err := ioutil.TempDir("", "postgrestest")
