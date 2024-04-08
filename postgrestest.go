@@ -185,11 +185,8 @@ func (srv *Server) NewDatabase(ctx context.Context) (*sql.DB, error) {
 // CreateDatabase creates a new database on the server and returns its
 // data source name.
 func (srv *Server) CreateDatabase(ctx context.Context) (string, error) {
-	dbName, err := randomString(16)
-	if err != nil {
-		return "", fmt.Errorf("new database: %w", err)
-	}
-	_, err = srv.conn.ExecContext(ctx, "CREATE DATABASE \""+dbName+"\";")
+	const dbName = "test"
+	_, err := srv.conn.ExecContext(ctx, "CREATE DATABASE \""+dbName+"\";")
 	if err != nil {
 		return "", fmt.Errorf("new database: %w", err)
 	}
