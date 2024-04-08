@@ -34,7 +34,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -43,11 +45,11 @@ const superuserName = "postgres"
 
 // A Server represents a running PostgreSQL server.
 type Server struct {
-	dir     string
-	baseURL string
+	Dir     string
+	baseURL *url.URL
 	conn    *sql.DB
 
-	exited  <-chan struct{}
+	exited  chan struct{}
 	waitErr error
 }
 
@@ -81,25 +83,20 @@ func Start(ctx context.Context) (_ *Server, err error) {
 	err = runCommand("initdb",
 		"--no-sync",
 		"--username="+superuserName,
-		"--pwfile="+pwFile,
+		//"--pwfile="+pwFile,
 		"-D", dataDir)
 	if err != nil {
 		return nil, fmt.Errorf("start postgres: %w", err)
 	}
-	port, err := findUnusedTCPPort()
-	if err != nil {
-		return nil, fmt.Errorf("start postgres: %w", err)
-	}
 	const configFormat = "" +
-		"listen_addresses = localhost\n" +
-		"port = %d\n" +
-		"unix_socket_directories = ''\n" +
+		"listen_addresses = ''\n" +
+		"unix_socket_directories = '%s'\n" +
 		"fsync = off\n" +
 		"synchronous_commit = off\n" +
 		"full_page_writes = off\n"
 	err = ioutil.WriteFile(
 		filepath.Join(dataDir, "postgresql.conf"),
-		[]byte(fmt.Sprintf(configFormat, port)),
+		[]byte(fmt.Sprintf(configFormat, dir)),
 		0666)
 	if err != nil {
 		return nil, fmt.Errorf("start postgres: %w", err)
@@ -117,23 +114,36 @@ func Start(ctx context.Context) (_ *Server, err error) {
 	if err := proc.Start(); err != nil {
 		return nil, fmt.Errorf("start postgres: %w", err)
 	}
-	exited := make(chan struct{})
-	srv := &Server{
-		dir: dir,
-		baseURL: (&url.URL{
-			Scheme: "postgres",
-			Host:   fmt.Sprintf("localhost:%d", port),
-			User:   url.UserPassword(superuserName, superuserPassword),
-			Path:   "/",
-		}).String(),
-		exited: exited,
+	srv, err := Resume(ctx, dir)
+	if err != nil {
+		return nil, err
 	}
 	go func() {
-		defer close(exited)
+		defer close(srv.exited)
 		srv.waitErr = proc.Wait()
 	}()
+	return srv, nil
+}
+
+func Resume(ctx context.Context, dir string) (*Server, error) {
+	logFile := filepath.Join(dir, "log.txt")
+
+	srv := &Server{
+		Dir: dir,
+		baseURL: &url.URL{
+			Scheme: "postgres",
+			Host:   "localhost",
+			User:   url.UserPassword(superuserName, ""),
+			Path:   "/",
+			RawQuery: (&url.Values{
+				"host": []string{dir},
+			}).Encode(),
+		},
+		exited: make(chan struct{}),
+	}
 
 	// Wait for server to come up healthy.
+	var err error
 	srv.conn, err = sql.Open("postgres", srv.DefaultDatabase())
 	if err != nil {
 		// Failure to open means the DSN is invalid. Connections aren't created
@@ -170,7 +180,14 @@ func (srv *Server) DefaultDatabase() string {
 }
 
 func (srv *Server) dsn(dbName string) string {
-	return srv.baseURL + dbName + "?sslmode=disable"
+	u := *srv.baseURL
+	u.Path = dbName
+	q := u.Query()
+	q.Set("sslmode", "disable")
+	u.RawQuery = q.Encode()
+	dsn := u.String()
+	dsn = strings.ReplaceAll(dsn, "localhost", "")
+	return dsn
 }
 
 // NewDatabase opens a connection to a freshly created database on the server.
@@ -195,11 +212,25 @@ func (srv *Server) CreateDatabase(ctx context.Context) (string, error) {
 
 // Cleanup shuts down the server and deletes any on-disk files the server used.
 func (srv *Server) Cleanup() {
+	srv.stop()
+
+	// Wait until the server stopped
 	if srv.conn != nil {
+		ctx := context.Background()
+		for {
+			err := srv.conn.PingContext(ctx)
+			if err == nil {
+				// server still running
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			// server stopped
+			break
+		}
 		srv.conn.Close()
 	}
-	srv.stop()
-	os.RemoveAll(srv.dir)
+
+	os.RemoveAll(srv.Dir)
 }
 
 func (srv *Server) stop() {
@@ -208,7 +239,7 @@ func (srv *Server) stop() {
 	//
 	// TODO(someday): What happens if this fails?
 	runCommand("pg_ctl", "stop",
-		"--pgdata="+filepath.Join(srv.dir, "data"),
+		"--pgdata="+filepath.Join(srv.Dir, "data"),
 		"--mode=immediate",
 		"--wait")
 	<-srv.exited
