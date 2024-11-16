@@ -70,5 +70,10 @@ jobs:
         # Run on the latest minor release of Go 1.23:
         go-version: ^1.23
 
+    - name: Install PostgreSQL
+      run: |
+        brew install postgresql
+        brew link postgresql
+
     - name: Run tests
       run: go test -race -v ./...
