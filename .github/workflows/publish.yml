@@ -24,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Set up Go
-      uses: actions/setup-go@v1
+      uses: actions/setup-go@v4
       with:
-        go-version: 1.14
+        # Run on the latest minor release of Go 1.23:
+        go-version: ^1.23
+
     - name: Fetch release from proxy
-      run: go get -d zombiezen.com/go/postgrestest@"$(echo "$GITHUB_REF" | sed -e 's:^refs/tags/::')"
-      env:
-        GO111MODULE: on
+      run: go get -d github.com/stapelberg/postgrestest@"$(echo "$GITHUB_REF" | sed -e 's:^refs/tags/::')"
