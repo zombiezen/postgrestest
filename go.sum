@@ -1,2 +1,2 @@
-github.com/lib/pq v1.8.0 h1:9xohqzkUwzR4Ga4ivdTcawVS89YSDVxXMa3xJX3cGzg=
-github.com/lib/pq v1.8.0/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
+github.com/lib/pq v1.10.10-0.20241116184759-b7ffbd3b47da h1:b0x2DrMfYi9f0dIn36/xrX3ztyam/fByaN14MO48G7s=
+github.com/lib/pq v1.10.10-0.20241116184759-b7ffbd3b47da/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=

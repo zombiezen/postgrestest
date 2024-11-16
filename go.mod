@@ -18,4 +18,4 @@ module zombiezen.com/go/postgrestest
 
 go 1.14
 
-require github.com/lib/pq v1.8.0
+require github.com/lib/pq v1.10.10-0.20241116184759-b7ffbd3b47da
