@@ -30,14 +30,6 @@ jobs:
         # Run on the latest minor release of Go 1.23:
         go-version: ^1.23
 
-    # Instructions from https://www.postgresql.org/download/linux/ubuntu/
-    - name: Install PostgreSQL
-      run: |
-        echo 'deb http://apt.postgresql.org/pub/repos/apt/ jammy-pgdg main' | sudo tee /etc/apt/sources.list.d/pgdg.list
-        sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends postgresql
-
     - name: Run tests
       run: go test -race -v ./...
 
