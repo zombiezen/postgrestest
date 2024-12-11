@@ -21,6 +21,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"os/exec"
 	"strings"
 	"testing"
@@ -162,6 +163,20 @@ func BenchmarkDocker(b *testing.B) {
 
 type logger interface {
 	Log(...interface{})
+}
+
+func findUnusedTCPPort() (int, error) {
+	l, err := net.ListenTCP("tcp", &net.TCPAddr{
+		IP: net.IPv4(127, 0, 0, 1),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("find unused tcp port: %w", err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	if err := l.Close(); err != nil {
+		return 0, fmt.Errorf("find unused tcp port: %w", err)
+	}
+	return port, nil
 }
 
 func startDocker(l logger, dockerExe string) (db *sql.DB, cleanup func(), _ error) {
