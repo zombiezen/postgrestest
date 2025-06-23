@@ -3,6 +3,8 @@
 [![Reference](https://pkg.go.dev/badge/zombiezen.com/go/postgrestest?tab=doc)](https://pkg.go.dev/zombiezen.com/go/postgrestest?tab=doc)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
+**This package is no longer maintained. See [`github.com/stapelberg/postgrestest`](https://pkg.go.dev/github.com/stapelberg/postgrestest) for a better replacement.**
+
 Package `postgrestest` provides a test harness that starts an ephemeral
 [PostgreSQL][] server. It is tested on macOS, Linux, and Windows. It can cut
 down the overhead of PostgreSQL in tests up to 90% compared to spinning up a
